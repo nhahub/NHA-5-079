@@ -12,7 +12,7 @@ with DAG(
     dag_id="moi_crime_pipeline",
     default_args=default_args,
     schedule="@daily",
-    start_date=datetime(2026, 10, 1),
+    start_date=datetime(2026, 11, 1),
     catchup=False,
     tags=["crime_intelligence", "medallion", "production"],
 ) as dag:

@@ -95,6 +95,7 @@ def save_checkpoint(records_dict, output_path):
     temp_path.replace(output_path)
 
 
+
 def extract_crime_cases(start_page=1, end_page=None, output_path=None, delay=0.25):
     """
     Production-grade batch extraction pipeline:
@@ -126,16 +127,16 @@ def extract_crime_cases(start_page=1, end_page=None, output_path=None, delay=0.2
 
     session = requests.Session()
 
-    # 2. Probe total count if end_page is not provided
     print("=" * 65)
     print(f"🚀 MOI CRIME ARCHIVE INGESTION")
     print(f"🎯 Target Section: {SECTION_ID} (أهم القضايا)")
     print("=" * 65)
-
+    
+    # 2. Probe total count if end_page is not provided
     try:
         probe_res = session.get(INDEX_ENDPOINT, params={"sectionId": SECTION_ID, "pageIndex": 1}, headers=HEADERS, timeout=10)
         probe_data = probe_res.json()
-        total_items = probe_data.get("pager", {}).get("totalCount", 4700)
+        total_items = probe_data.get("pager", {}).get("totalCount")
         calculated_pages = (total_items + ARTICLES_PER_PAGE - 1) // ARTICLES_PER_PAGE
         if end_page is None:
             end_page = calculated_pages
@@ -202,6 +203,10 @@ def extract_crime_cases(start_page=1, end_page=None, output_path=None, delay=0.2
 
                 # Save checkpoint after every page
                 save_checkpoint(records_dict, output_path)
+
+                if page_new_count == 0:
+                    print(f"\n🛑 All articles on page {page} already exist in Bronze. Terminating.")
+                    break
 
                 elapsed = time.time() - start_time
                 pct = (page / end_page) * 100
