@@ -3,10 +3,21 @@ import json
 import time
 from pathlib import Path
 import pandas as pd
+import logging
 
 # Ensure UTF-8 output in Windows PowerShell/cmd terminals
 if sys.stdout.encoding != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+
+logger = logging.getLogger("transform_silver")
+
 
 # =============================================================================
 # 1. Arabic Text Normalization (Pure string .replace)
@@ -26,42 +37,44 @@ def normalize_arabic(text):
 # Matches schema.sql dim_location EXACTLY.
 # =============================================================================
 GOVERNORATES = {
-    # Frontier Sinai (checked before generic keywords)
-    26: ["شمال سيناء", "العريش", "رفح", "شيخ زويد"],
+
+    #Frontier Sinai (checked before generic keywords)
     27: ["جنوب سيناء", "شرم الشيخ", "طور سيناء", "دهب", "نويبع"],
-    23: ["البحر الأحمر", "بحر احمر", "الغردقه", "غردقه", "سفاجا", "قصير"],
-    24: ["الوادي الجديد", "وادي جديد", "الخارجه", "الداخله", "فرافره"],
+    26: ["شمال سيناء", "العريش", "رفح", "شيخ زويد"],
     25: ["مطروح", "مرسي مطروح", "السلوم", "العلمين", "الضبعة"],
-    
-    # Greater Cairo
-    1: ["القاهرة", "قاهره", "شبرا", "حلوان", "مطريه", "عين شمس", "المرج", "المعادي", "التجمع"],
-    2: ["الجيزة", "جيزه", "اكتوبر", "زايد", "الهرم", "فيصل", "العجوزه", "الدقي", "بولاق الدكرور", "بدرشين", "الصف"],
-    3: ["القليوبية", "قليوبيه", "بنها", "شبرا الخيمه", "القناطر"],
-    
-    # Alexandria & Delta
-    4: ["الإسكندرية", "اسكندريه", "برج العرب", "العامريه", "الرمل", "سيدي جابر", "المنتزه"],
-    5: ["البحيرة", "بحيره", "دمنهور", "كفر الدوار", "ايتاي البارود"],
-    6: ["كفر الشيخ", "كفرالشيخ", "دسوق", "بلطيم", "فوه"],
-    7: ["الغربية", "غربيه", "طنطا", "المحله الكبري", "المحله", "زفتي"],
-    8: ["المنوفية", "منوفيه", "شبين الكوم", "اشمون", "قويسنا", "السادات", "منوف"],
-    9: ["الدقهلية", "دقهليه", "المنصوره", "منصوره", "ميت غمر", "بلقاس", "دكرنس"],
-    10: ["الشرقية", "شرقيه", "الزقازيق", "زقازيق", "العاشر من رمضان", "بلبيس", "فاقوس"],
-    11: ["دمياط", "راس البر", "فارسكور"],
-    
-    # Canal Zone
-    12: ["بورسعيد", "بور سعيد"],
-    13: ["الإسماعيلية", "اسماعيليه", "فايد", "القنطره"],
-    14: ["السويس", "سويس", "العين السخنه"],
-    
-    # Upper Egypt
-    15: ["الفيوم", "فيوم", "طاميه", "سنورس", "اطسا"],
-    16: ["بني سويف", "بنسويف", "الواسطي", "ببا", "اهناسيا"],
-    17: ["المنيا", "منيا", "ملوي", "مغاغه", "سمالوط", "بني مزار", "ابو قرقاص"],
-    18: ["أسيوط", "اسيوط", "ديروط", "القوصيه", "ابنوب", "منفلوط"],
-    19: ["سوهاج", "طهطا", "جرجا", "اخميم", "المراغه"],
-    20: ["قنا", "نجع حمادي", "دشنا", "ابو تشت", "فرشوط", "قفط"],
-    21: ["الأقصر", "اقصر", "اسنا", "ارمنت"],
+    24: ["الوادي الجديد", "وادي جديد", "الخارجه", "الداخله", "فرافره"],
+    23: ["البحر الأحمر", "بحر احمر", "الغردقه", "غردقه", "سفاجا", "قصير"],
+
+    #Upper Egypt
     22: ["أسوان", "اسوان", "كوم امبو", "ادفو", "النوبه"],
+    21: ["الأقصر", "اقصر", "اسنا", "ارمنت"],
+    20: ["قنا", "نجع حمادي", "دشنا", "ابو تشت", "فرشوط", "قفط"],
+    19: ["سوهاج", "طهطا", "جرجا", "اخميم", "المراغه"],
+    18: ["أسيوط", "اسيوط", "ديروط", "القوصيه", "ابنوب", "منفلوط"],
+    17: ["المنيا", "منيا", "ملوي", "مغاغه", "سمالوط", "بني مزار", "ابو قرقاص"],
+    16: ["بني سويف", "بنسويف", "الواسطي", "ببا", "اهناسيا"],
+    15: ["الفيوم", "فيوم", "طاميه", "سنورس", "اطسا"],
+
+    #Canal Zone
+    14: ["السويس", "سويس", "العين السخنه"],
+    13: ["الإسماعيلية", "اسماعيليه", "فايد", "القنطره"],
+    12: ["بورسعيد", "بور سعيد"],
+
+    #*Alexandria & Delta
+    11: ["دمياط", "راس البر", "فارسكور"],
+    10: ["الشرقية", "شرقيه", "الزقازيق", "زقازيق", "العاشر من رمضان", "بلبيس", "فاقوس"],
+    9: ["الدقهلية", "دقهليه", "المنصوره", "منصوره", "ميت غمر", "بلقاس", "دكرنس"],
+    8: ["المنوفية", "منوفيه", "شبين الكوم", "اشمون", "قويسنا", "السادات", "منوف"],
+    7: ["الغربية", "غربيه", "طنطا", "المحله الكبري", "المحله", "زفتي"],
+    6: ["كفر الشيخ", "كفرالشيخ", "دسوق", "بلطيم", "فوه"],
+    5: ["البحيرة", "بحيره", "دمنهور", "كفر الدوار", "ايتاي البارود"],
+    4: ["الإسكندرية", "اسكندريه", "برج العرب", "العامريه", "الرمل", "سيدي جابر", "المنتزه"],
+
+    #Greater Cairo
+    3: ["القليوبية", "قليوبيه", "بنها", "شبرا الخيمه", "القناطر"],
+    2: ["الجيزة", "جيزه", "اكتوبر", "زايد", "الهرم", "فيصل", "العجوزه", "الدقي", "بولاق الدكرور", "بدرشين", "الصف"],
+    1: ["القاهرة", "قاهره", "شبرا", "حلوان", "مطريه", "عين شمس", "المرج", "المعادي", "التجمع"],
+    
 }
 
 
@@ -178,11 +191,9 @@ def transform_bronze_to_silver(bronze_file=None, silver_file=None):
     if silver_file is None:
         silver_file = data_dir / "silver_crime_news.parquet"
 
-    print("=" * 70)
-    print("🚀 STARTING SILVER TRANSFORMATION PIPELINE")
-    print(f"📦 Source (Bronze): {bronze_file.name}")
-    print(f"🎯 Target (Silver): {silver_file.name}")
-    print("=" * 70)
+    logger.info("STARTING SILVER TRANSFORMATION PIPELINE")
+    logger.info(f"Source (Bronze): {bronze_file.name}")
+    logger.info(f"Target (Silver): {silver_file.name}")
 
     start_time = time.time()
 
@@ -190,7 +201,7 @@ def transform_bronze_to_silver(bronze_file=None, silver_file=None):
         bronze_data = json.load(f)
 
     total_records = len(bronze_data)
-    print(f"Loaded {total_records:,} raw articles from Bronze.")
+    logger.info(f"Loaded {total_records:,} raw articles from Bronze.")
 
     silver_records = []
     loc_matched = 0
@@ -249,19 +260,13 @@ def transform_bronze_to_silver(bronze_file=None, silver_file=None):
     df.to_parquet(silver_file, engine="pyarrow", index=False)
 
     duration = time.time() - start_time
-    bronze_mb = bronze_file.stat().st_size / (1024 * 1024)
-    silver_mb = silver_file.stat().st_size / (1024 * 1024)
 
-    print("\n" + "=" * 70)
-    print("🎉 SILVER TRANSFORMATION COMPLETED SUCCESSFULLY!")
-    print(f"📊 Processed Records   : {total_records:,}")
-    print(f"📍 Location Match Rate : {loc_matched:,}/{total_records:,} ({(loc_matched/total_records)*100:.1f}%)")
-    print(f"🏷️ Crime Match Rate    : {crime_matched:,}/{total_records:,} ({(crime_matched/total_records)*100:.1f}%)")
-    print(f"💾 Bronze JSON Size    : {bronze_mb:.2f} MB")
-    print(f"⚡ Silver Parquet Size : {silver_mb:.2f} MB (Compression: {(1 - silver_mb/bronze_mb)*100:.1f}%)")
-    print(f"⏱️ Total Duration      : {duration:.2f} seconds")
-    print(f"📁 Destination         : {silver_file}")
-    print("=" * 70)
+    logger.info("SILVER TRANSFORMATION COMPLETED SUCCESSFULLY!")
+    logger.info(f"Processed Records   : {total_records:,}")
+    logger.info(f"Location Match Rate : {loc_matched:,}/{total_records:,} ({(loc_matched/total_records)*100:.1f}%)")
+    logger.info(f"Crime Match Rate    : {crime_matched:,}/{total_records:,} ({(crime_matched/total_records)*100:.1f}%)")
+    logger.info(f"Total Duration      : {duration:.2f} seconds")
+    logger.info(f"Destination         : {silver_file}")
 
     return df
 

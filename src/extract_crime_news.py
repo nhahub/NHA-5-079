@@ -2,6 +2,7 @@ import sys
 import re
 import json
 import time
+import logging
 from pathlib import Path
 from datetime import datetime, timezone
 import requests
@@ -12,6 +13,16 @@ if sys.stdout.encoding != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 if sys.stderr.encoding != "utf-8":
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+
+logger = logging.getLogger("extract_bronze")
+
 
 # --- CONFIGURATION ---
 INDEX_ENDPOINT = "https://www.moi.gov.eg/News/GetNews"
@@ -72,13 +83,13 @@ def fetch_article_details(session, news_id, section_id=SECTION_ID, max_retries=3
                 return "", []
             elif response.status_code == 429:
                 wait_time = 2 * attempt
-                print(f"    [429 Rate Limit] Backing off for {wait_time}s...")
+                logger.warning(f"[429 Rate Limit] Backing off for {wait_time}s...")
                 time.sleep(wait_time)
             else:
                 time.sleep(1)
         except requests.RequestException as e:
             if attempt == max_retries:
-                print(f"    [WARN] Failed to fetch details for {news_id}: {e}")
+                logger.warning(f"Failed to fetch details for {news_id}: {e}")
             time.sleep(1.5)
 
     return "", []
@@ -121,18 +132,16 @@ def extract_crime_cases(start_page=1, end_page=None, output_path=None, delay=0.2
                 for item in existing_list:
                     if isinstance(item, dict) and "news_id" in item:
                         records_dict[item["news_id"]] = item
-            print(f"🔄 Resuming extraction: Found {len(records_dict)} previously saved articles.")
+            logger.info(f"Resuming extraction: Found {len(records_dict)} previously saved articles.")
+
         except Exception as e:
-            print(f"⚠️ Warning: Could not read existing file ({e}). Starting fresh.")
+            logger.warning(f"Could not read existing file ({e}). Starting fresh.")
 
-    session = requests.Session()
+   
 
-    print("=" * 65)
-    print(f"🚀 MOI CRIME ARCHIVE INGESTION")
-    print(f"🎯 Target Section: {SECTION_ID} (أهم القضايا)")
-    print("=" * 65)
-    
     # 2. Probe total count if end_page is not provided
+    session = requests.Session()
+    
     try:
         probe_res = session.get(INDEX_ENDPOINT, params={"sectionId": SECTION_ID, "pageIndex": 1}, headers=HEADERS, timeout=10)
         probe_data = probe_res.json()
@@ -140,11 +149,12 @@ def extract_crime_cases(start_page=1, end_page=None, output_path=None, delay=0.2
         calculated_pages = (total_items + ARTICLES_PER_PAGE - 1) // ARTICLES_PER_PAGE
         if end_page is None:
             end_page = calculated_pages
-        print(f"📊 Archive Stats: {total_items:,} articles across {calculated_pages} pages.")
-        print(f"🎯 Execution Target: Pages {start_page} to {end_page}")
-        print("=" * 65)
+
+        logger.info(f"Archive Stats: {total_items:,} articles across {calculated_pages} pages.")
+        logger.info(f"Execution Target: Pages {start_page} to {end_page}.")
+
     except Exception as e:
-        print(f"⚠️ Could not probe total pages: {e}. Defaulting to end_page = {end_page or 588}")
+        logger.warning(f"Could not probe total pages: {e}. Defaulting to end_page = {end_page or 588}")
         if end_page is None:
             end_page = 588
 
@@ -158,13 +168,13 @@ def extract_crime_cases(start_page=1, end_page=None, output_path=None, delay=0.2
             try:
                 res = session.get(INDEX_ENDPOINT, params=params, headers=HEADERS, timeout=12)
                 if res.status_code != 200:
-                    print(f"  [ERROR] Page {page} returned status {res.status_code}. Skipping.")
+                    logger.error(f"Page {page} returned status {res.status_code}. Skipping.")
                     continue
 
                 data = res.json()
                 results = data.get("results", [])
                 if not results:
-                    print(f"  [INFO] No articles returned on page {page}. Reached end of archive.")
+                    logger.info(f"No articles returned on page {page}. Reached end of archive.")
                     break
 
                 page_new_count = 0
@@ -205,34 +215,32 @@ def extract_crime_cases(start_page=1, end_page=None, output_path=None, delay=0.2
                 save_checkpoint(records_dict, output_path)
 
                 if page_new_count == 0:
-                    print(f"\n🛑 All articles on page {page} already exist in Bronze. Terminating.")
+                    logger.info(f"All articles on page {page} already exist in Bronze. Terminating.")
                     break
 
                 elapsed = time.time() - start_time
                 pct = (page / end_page) * 100
-                print(f"  ✅ Page {page}/{end_page} ({pct:.1f}%) | +{page_new_count} new | Total stored: {len(records_dict)} | Time: {elapsed:.0f}s")
+                logger.info(f"Page {page}/{end_page} ({pct:.1f}%) | +{page_new_count} new | Total stored: {len(records_dict)} | Time: {elapsed:.0f}s")
 
             except Exception as e:
-                print(f"  [ERROR] Failed to process page {page}: {e}")
+                logger.error(f"Failed to process page {page}: {e}")
                 time.sleep(2)
 
     except KeyboardInterrupt:
-        print("\n\n⚠️ Process paused by user (Ctrl+C). Saving current checkpoint...")
+        logger.warning("Process paused by user (Ctrl+C). Saving current checkpoint...")
         save_checkpoint(records_dict, output_path)
-        print(f"💾 Checkpoint saved safely: {len(records_dict)} articles persisted.")
+        logger.info(f"Checkpoint saved safely: {len(records_dict)} articles persisted.")
         return list(records_dict.values())
 
-    print("\n" + "=" * 65)
-    print(f"🎉 EXTRACTION COMPLETE!")
-    print(f"📦 Total articles in Bronze store: {len(records_dict):,}")
-    print(f"⏱️ Total duration: {(time.time() - start_time) / 60:.1f} minutes")
-    print(f"📁 Destination: {output_path}")
-    print("=" * 65)
+    logger.info("EXTRACTION COMPLETE!")
+    logger.info(f"Total articles in Bronze store: {len(records_dict):,}")
+    logger.info(f"Total duration: {(time.time() - start_time) / 60:.1f} minutes")
+    logger.info(f"Destination: {output_path}")
 
     return list(records_dict.values())
 
 
 if __name__ == "__main__":
-    # By default, runs from page 1 to the end of the archive (all 4,700 articles)
+    # By default, runs from page 1 to the end of the archive all 4,700 articles
     # Can be safely stopped and resumed at any time without losing data!
     extract_crime_cases(start_page=1, end_page=None)

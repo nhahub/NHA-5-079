@@ -6,14 +6,25 @@ import pandas as pd
 import psycopg2
 from psycopg2.extras import execute_values
 from dotenv import load_dotenv
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-load_dotenv(dotenv_path=PROJECT_ROOT / ".env")
+import logging 
 
 
 # Ensure UTF-8 output in Windows PowerShell/cmd terminals
 if sys.stdout.encoding != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+
+logger = logging.getLogger("load_gold")
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(dotenv_path=PROJECT_ROOT / ".env")
+
 
 
 def load_silver_to_gold(parquet_path=None):
@@ -29,21 +40,19 @@ def load_silver_to_gold(parquet_path=None):
         parquet_path = Path(parquet_path)
 
     if not parquet_path.exists():
-        print(f"❌ Error: Silver Parquet file not found at {parquet_path}")
+        logger.error(f"Silver Parquet file not found at {parquet_path}")
         sys.exit(1)
 
-    print("=" * 70)
-    print("🚀 STARTING GOLD WAREHOUSE LOADER")
-    print(f"📦 Source (Silver): {parquet_path.name}")
-    print(f"🎯 Target Database: {os.getenv('DB_NAME', 'moi_crime_dw')}")
-    print("=" * 70)
+    logger.info("STARTING GOLD WAREHOUSE LOADER")
+    logger.info(f"Source (Silver): {parquet_path.name}")
+    logger.info(f"Target Database: {os.getenv('DB_NAME', 'moi_crime_dw')}")
 
     start_time = time.time()
 
     # 1. Read Silver Parquet
     df = pd.read_parquet(parquet_path)
     total_silver_rows = len(df)
-    print(f"Loaded {total_silver_rows:,} records from Silver Parquet.")
+    logger.info(f"Loaded {total_silver_rows:,} records from Silver Parquet.")
 
     # Convert DataFrame rows into a list of tuples for psycopg2
     records_to_insert = [
@@ -78,7 +87,7 @@ def load_silver_to_gold(parquet_path=None):
         ) as conn:
             
             with conn.cursor() as cursor:
-                print(f" Connected to PostgreSQL")
+                logger.info("Connected to PostgreSQL")
 
                 # 3. Fast Bulk Insert using execute_values
                 insert_query = """
@@ -91,7 +100,7 @@ def load_silver_to_gold(parquet_path=None):
                 ON CONFLICT (news_id) DO NOTHING;
                 """
 
-                print(f"⏳ Bulk inserting {len(records_to_insert):,} rows into fact_crime...")
+                logger.info(f"Bulk inserting {len(records_to_insert):,} rows into fact_crime...")
                 execute_values(cursor, insert_query, records_to_insert, page_size=1000)
 
                 # 4. Warehouse Verification Queries
@@ -109,19 +118,17 @@ def load_silver_to_gold(parquet_path=None):
 
                 duration = time.time() - start_time
 
-                print("\n" + "=" * 70)
-                print("🎉 GOLD WAREHOUSE LOAD COMPLETE!")
-                print(f"📊 Total Rows in fact_crime   : {total_in_warehouse:,}")
-                print(f"📍 Mapped to Known Location   : {with_location:,} ({(with_location/total_in_warehouse)*100:.1f}%)")
-                print(f"🏷️ Mapped to Crime Category   : {with_crime:,} ({(with_crime/total_in_warehouse)*100:.1f}%)")
-                print(f"👥 Total Suspects Tracked     : {int(total_suspects):,}")
-                print(f"🔫 Total Weapons Tracked      : {int(total_weapons):,}")
-                print(f"🚔 Total Security Campaigns   : {int(total_campaigns):,}")
-                print(f"⏱️ Load Duration              : {duration:.2f} seconds")
-                print("=" * 70)
+                logger.info("GOLD WAREHOUSE LOAD COMPLETE!")
+                logger.info(f"Total Rows in fact_crime   : {total_in_warehouse:,}")
+                logger.info(f"Mapped to Known Location   : {with_location:,} ({(with_location/total_in_warehouse)*100:.1f}%)")
+                logger.info(f"Mapped to Crime Category   : {with_crime:,} ({(with_crime/total_in_warehouse)*100:.1f}%)")
+                logger.info(f"Total Suspects Tracked     : {int(total_suspects):,}")
+                logger.info(f"Total Weapons Tracked      : {int(total_weapons):,}")
+                logger.info(f"Total Security Campaigns   : {int(total_campaigns):,}")
+                logger.info(f"Load Duration              : {duration:.2f} seconds")
 
     except Exception as e:
-        print(f"❌ Database error: {e}")
+        logger.error(f"Database Connection error: {e}")
         sys.exit(1)
     finally:
         if conn is not None:
