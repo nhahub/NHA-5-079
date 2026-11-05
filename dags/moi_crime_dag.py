@@ -27,6 +27,11 @@ with DAG(
         bash_command="python src/transform_silver.py",
     )
 
+    upload_cloud = BashOperator(
+        task_id="upload_cloud",
+        bash_command="python src/upload_cloud_lake.py"
+    )
+    
     load_gold = BashOperator(
         task_id="load_gold",
         bash_command="python src/load_gold_warehouse.py",
@@ -35,7 +40,8 @@ with DAG(
     quality_gate = BashOperator(
         task_id="quality_gate",
         bash_command="pytest tests/test_warehouse.py",
+        
     )
 
-    extract_bronze >> transform_silver >> load_gold >> quality_gate
+    extract_bronze >> transform_silver >> upload_cloud >> load_gold >> quality_gate
 
