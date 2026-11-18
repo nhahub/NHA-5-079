@@ -8,6 +8,7 @@ from src.transform_silver import (
     extract_location_id,
     extract_crime_type_id,
     extract_metrics,
+    extract_date_id
 )
 
 def test_normalize_arabic():
@@ -19,6 +20,7 @@ def test_extract_location_id():
     assert extract_location_id("ضبط شخص في العريش", "") == 26 
     assert extract_location_id("مشاجرة في المنتزه", "") == 4
     assert extract_location_id("بيان رسمي عام", "لا تفاصيل") == 0
+    assert extract_location_id("بيان من القاهرة حول ضبط متهم في العريش", "") == 26
 
 def test_extract_crime_type_id():
     assert extract_crime_type_id("ضبط حشيش وهيروين", "") == 2
@@ -40,3 +42,11 @@ def test_real_moi_article():
     assert extract_location_id(title, body) == 2
     assert extract_crime_type_id(title, body) == 0
     assert extract_metrics(title, body) == (1, 0, False)
+
+
+def test_extract_date_id():
+    assert extract_date_id("2026-11-05") == 20261105 
+    assert extract_date_id(None) == 0 
+    assert extract_date_id("invalid") == 0 
+   
+
