@@ -3,10 +3,12 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.tmp
+*.bak
 
 # Virtual Environments & Secrets
 .venv/
 venv/
+ingestion-venv/
 env/
 ENV/
 .env
@@ -24,3 +26,4 @@ bronze_crime_news.json
 .idea/
 .DS_Store
 Thumbs.db
+*:Zone.Identifier

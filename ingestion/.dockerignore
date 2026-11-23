@@ -1,0 +1,11 @@
+.env
+**/.env
+data/
+src/results/
+results/
+**/__pycache__/
+*.jsonl
+*.bak
+ingestion-venv/
+venv/
+.git/
