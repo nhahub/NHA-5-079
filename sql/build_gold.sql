@@ -55,18 +55,22 @@ SELECT
     bi.bridge_id, bi.incident_key, bi.item_key, bi.quantity, bi.status, 
 
     CASE
-        WHEN TRIM(bi.unit) IN ('كيلو جرام', 'كيلوجرام', 'كج') THEN 'كيلوجرام'
+        WHEN TRIM(bi.unit) IN ('كيلو جرام', 'كيلوجرام', 'كج', 'كيلو غرام', 'كيلوغرام', 'كغ') THEN 'كيلوجرام'
+        WHEN TRIM(bi.unit) = 'غرام' THEN 'جرام'
         WHEN TRIM(bi.unit) IN ('وحدة') THEN 'قطعة'
         WHEN bi.unit IS NULL OR TRIM(bi.unit) = '' THEN 'غير محدد'
         ELSE TRIM(bi.unit)
     END AS unit_clean,
 
     CASE
+        WHEN TRIM(bi.unit) = 'طن' AND bi.quantity >= 1000 THEN bi.quantity
         WHEN TRIM(bi.unit) = 'طن' THEN bi.quantity * 1000.0
-        WHEN TRIM(bi.unit) IN ('كيلو جرام', 'كيلوجرام', 'كج') THEN bi.quantity
-        WHEN TRIM(bi.unit) = 'جرام' THEN bi.quantity / 1000.0
+        WHEN TRIM(bi.unit) IN ('كيلو جرام', 'كيلوجرام', 'كج', 'كيلو غرام', 'كيلوغرام', 'كغ') AND bi.quantity >= 1000 THEN bi.quantity / 1000.0
+        WHEN TRIM(bi.unit) IN ('كيلو جرام', 'كيلوجرام', 'كج', 'كيلو غرام', 'كيلوغرام', 'كغ') THEN bi.quantity
+        WHEN TRIM(bi.unit) IN ('جرام', 'غرام') THEN bi.quantity / 1000.0
         ELSE NULL
-    END AS quantity_kg
+    END AS quantity_kg,
+    (TRIM(bi.unit) IN ('طن', 'كيلو جرام', 'كيلوجرام', 'كج', 'كيلو غرام', 'كيلوغرام', 'كغ') AND bi.quantity >= 1000) AS is_unit_corrected
 
 FROM silver.bridge_incident_item bi
 JOIN gold.fact_incident g
