@@ -158,11 +158,11 @@ _TEXT = {
         "slice_showing": "Showing",
         "slice_of": "of",
         "slice_releases": "releases",
-        "kpi_releases": "Official Releases · البيانات",
+        "kpi_releases": "Releases · البيانات",
         "kpi_arrests": "Arrests · الموقوفون",
         "kpi_deaths": "Fatalities · الوفيات",
         "kpi_drugs": "Narcotics · المخدرات",
-        "kpi_financial": "Stated Value · القيمة المالية",
+        "kpi_financial": "Stated Value · القيمة",
         "national_share": "of national",
         "kpi_releases_sub": "{single:,} single · {camp:,} campaigns",
         "kpi_arrests_sub": "Avg {avg:.1f} arrests / release",
@@ -322,34 +322,65 @@ def _render_css(is_ar: bool) -> None:
                 margin-bottom: 0.95rem;
                 color: {PALETTE["ink"]};
             }}
+            .kpi-grid {{
+                display: grid;
+                grid-template-columns: repeat(5, minmax(0, 1fr));
+                gap: 0.75rem;
+                align-items: stretch;
+                margin-bottom: 0.85rem;
+            }}
+            .kpi-grid-3 {{
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 0.75rem;
+                align-items: stretch;
+                margin-bottom: 0.85rem;
+            }}
+            @media (max-width: 1120px) {{
+                .kpi-grid {{
+                    grid-template-columns: repeat(3, minmax(0, 1fr));
+                }}
+            }}
+            @media (max-width: 680px) {{
+                .kpi-grid,
+                .kpi-grid-3 {{
+                    grid-template-columns: 1fr;
+                }}
+            }}
             .kpi-card {{
                 background: {PALETTE["surface"]};
                 border: 1px solid {PALETTE["hairline"]};
                 border-top: 3px solid {PALETTE["navy"]};
                 border-radius: 8px;
-                padding: 0.85rem 1.0rem;
+                padding: 0.85rem 0.9rem;
+                box-sizing: border-box;
+                display: flex;
+                flex-direction: column;
                 height: 100%;
             }}
             .kpi-card.crimson {{ border-top-color: {PALETTE["crimson"]}; }}
             .kpi-card.ochre {{ border-top-color: {PALETTE["ochre"]}; }}
             .kpi-card.teal {{ border-top-color: {PALETTE["teal"]}; }}
             .kpi-lbl {{
-                font-size: 0.78rem;
+                font-size: 0.75rem;
                 font-weight: 600;
+                line-height: 1.3;
                 color: {PALETTE["muted_ink"]};
                 margin-bottom: 0.35rem;
             }}
             .kpi-val {{
-                font-size: 1.55rem;
+                font-size: clamp(1.08rem, 1.32vw, 1.46rem);
                 font-weight: 700;
                 font-variant-numeric: tabular-nums;
+                white-space: nowrap;
                 line-height: 1.2;
                 color: {PALETTE["ink"]};
             }}
             .kpi-sub {{
-                font-size: 0.76rem;
+                font-size: 0.75rem;
                 color: {PALETTE["muted_ink"]};
-                margin-top: 0.35rem;
+                margin-top: auto;
+                padding-top: 0.45rem;
                 line-height: 1.35;
             }}
             .kpi-share {{
@@ -660,7 +691,6 @@ def main() -> None:
             return None
         return f"{(cur / nat) * 100:.1f}% {txt['national_share']}"
 
-    kcols = st.columns(5)
     cards = [
         (
             txt["kpi_releases"],
@@ -698,10 +728,8 @@ def main() -> None:
             "",
         ),
     ]
-    for col, (lbl, val, sub, shr, tone) in zip(kcols, cards):
-        col.markdown(_kpi_html(lbl, val, sub, shr, tone), unsafe_allow_html=True)
-
-    st.markdown("<div style='height:0.65rem'></div>", unsafe_allow_html=True)
+    cards_html = "".join(_kpi_html(lbl, val, sub, shr, tone) for lbl, val, sub, shr, tone in cards)
+    st.markdown(f'<div class="kpi-grid">{cards_html}</div>', unsafe_allow_html=True)
 
     if filtered.empty:
         st.info(txt["empty_msg"])
@@ -876,12 +904,14 @@ def main() -> None:
 
     # ---------------- TAB 4: CONTRABAND & SEIZURES ----------------
     with tab_con:
-        ck1, ck2, ck3 = st.columns(3)
-        ck1.markdown(_kpi_html(txt["con_kpis"][0], f"{len(filtered_items):,}", txt["kpi_drugs_sub"].format(rows=len(drug_rows))), unsafe_allow_html=True)
-        ck2.markdown(_kpi_html(txt["con_kpis"][1], fmt_kg(cur_drugs_kg, lang=lang_code), f"{int(drug_rows['is_unit_corrected'].sum()):,} unit-fixed" if not is_ar else f"{int(drug_rows['is_unit_corrected'].sum()):,} سجلًا موحد الوحدة", tone="ochre"), unsafe_allow_html=True)
-        ck3.markdown(_kpi_html(txt["con_kpis"][2], fmt_egp(cur_fin_med, lang=lang_code), f"{cur_fin_cnt:,} {'stated' if not is_ar else 'بيان بقيمة مصرحة'} · {fmt_egp(cur_fin_total, lang=lang_code)}"), unsafe_allow_html=True)
-
-        st.markdown("<div style='height:0.65rem'></div>", unsafe_allow_html=True)
+        con_html = "".join(
+            [
+                _kpi_html(txt["con_kpis"][0], f"{len(filtered_items):,}", txt["kpi_drugs_sub"].format(rows=len(drug_rows))),
+                _kpi_html(txt["con_kpis"][1], fmt_kg(cur_drugs_kg, lang=lang_code), f"{int(drug_rows['is_unit_corrected'].sum()):,} unit-fixed" if not is_ar else f"{int(drug_rows['is_unit_corrected'].sum()):,} سجلًا موحد الوحدة", tone="ochre"),
+                _kpi_html(txt["con_kpis"][2], fmt_egp(cur_fin_med, lang=lang_code), f"{cur_fin_cnt:,} {'stated' if not is_ar else 'بيان بقيمة مصرحة'} · {fmt_egp(cur_fin_total, lang=lang_code)}"),
+            ]
+        )
+        st.markdown(f'<div class="kpi-grid-3">{con_html}</div>', unsafe_allow_html=True)
 
         b1, b2 = st.columns(2)
         with b1:
@@ -933,18 +963,15 @@ def main() -> None:
     # ---------------- TAB 5: DATA QUALITY & PIPELINE AUDIT ----------------
     with tab_dq:
         st.subheader(txt["dq_funnel_h"])
-        dq_cols = st.columns(5)
         dq_cards = [
-            ("Silver -> Gold (البيانات)" if is_ar else "Silver -> Gold Incidents", f"{audit['silver_incidents']:,} -> {audit['gold_incidents']:,}", "استبعاد الشائعات والتكرار" if is_ar else "Filtered rumors & duplicates", ""),
-            ("Silver -> Gold (الأحراز)" if is_ar else "Silver -> Gold Items", f"{audit['silver_items']:,} -> {audit['gold_items']:,}", "سجلات جدول الجسر النظيفة" if is_ar else "Verified bridge rows", "teal"),
+            ("Silver → Gold (البيانات)" if is_ar else "Silver → Gold Incidents", f"{audit['silver_incidents']:,} → {audit['gold_incidents']:,}", "استبعاد الشائعات والتكرار" if is_ar else "Filtered rumors & duplicates", ""),
+            ("Silver → Gold (الأحراز)" if is_ar else "Silver → Gold Items", f"{audit['silver_items']:,} → {audit['gold_items']:,}", "سجلات جدول الجسر النظيفة" if is_ar else "Verified bridge rows", "teal"),
             ("تصحيح وحدات الوزن" if is_ar else "Unit Repairs", f"{audit['unit_corrected_rows']:,}", "جرام / كجم / طن" if is_ar else "g / kg / metric ton normalized", "ochre"),
             ("إصلاح الفواصل العشرية" if is_ar else "Comma Outlier Repairs", f"{audit['fin_corrected_rows']:,}", "تضخم تاريخي مصحح" if is_ar else "Arabic decimal-comma fixes", ""),
             ("أصفار مالية محولة لـ NULL" if is_ar else "Fake Zeros Nullified", f"{audit['silver_fake_zeros']:,}", "تمييز غير المعلن عن الصفر" if is_ar else "Zeroes coerced to NULL", ""),
         ]
-        for col, (lbl, val, sub, tone) in zip(dq_cols, dq_cards):
-            col.markdown(_kpi_html(lbl, val, sub, tone=tone), unsafe_allow_html=True)
-
-        st.markdown("<div style='height:0.65rem'></div>", unsafe_allow_html=True)
+        dq_html = "".join(_kpi_html(lbl, val, sub, tone=tone) for lbl, val, sub, tone in dq_cards)
+        st.markdown(f'<div class="kpi-grid">{dq_html}</div>', unsafe_allow_html=True)
         st.subheader(txt["dq_checks_h"])
         checks = [
             (
