@@ -76,6 +76,19 @@ def run_gold_pipeline():
                 corrected_rows, drugs_kg = cursor.fetchone()
                 logger.info(f"Telemetry | is_unit_corrected={corrected_rows:,} rows | drugs_total_kg={drugs_kg:,} kg")
 
+                cursor.execute("""
+                    SELECT
+                        COUNT(financial_value) AS stated_cases,
+                        COUNT(*) FILTER (WHERE is_financial_corrected) AS corrected_fin,
+                        ROUND(COALESCE(SUM(financial_value), 0) / 1000000000.0, 2) AS total_egp_bn
+                    FROM gold.fact_incident
+                """)
+                stated_cases, corrected_fin, total_egp_bn = cursor.fetchone()
+                logger.info(
+                    f"Telemetry | financial_stated={stated_cases:,} cases | "
+                    f"is_financial_corrected={corrected_fin:,} rows | total_egp={total_egp_bn}B"
+                )
+
     except Exception as e:
         logger.error(f"Gold pipeline failed: {e}")
         sys.exit(1)

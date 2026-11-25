@@ -2,8 +2,6 @@ import os
 import psycopg2
 from pathlib import Path
 from dotenv import load_dotenv
-import logging
-import sys
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(dotenv_path=PROJECT_ROOT / ".env")
@@ -48,5 +46,12 @@ def test_unit_normalization_clean():
 def test_drugs_kg_no_1000x_outliers(): 
     rows = run_query("SELECT MAX(b.quantity_kg) FROM gold.bridge_incident_item b JOIN gold.dim_item i ON b.item_key = i.item_key WHERE i.item_category = 'drugs'")
     assert rows < 50000
+
+
+def test_financial_value_cleaned():
+    zero_count = run_query("SELECT COUNT(*) FROM gold.fact_incident WHERE financial_value = 0")
+    max_val = run_query("SELECT MAX(financial_value) FROM gold.fact_incident")
+    assert zero_count == 0
+    assert max_val < 5000000000
 
 

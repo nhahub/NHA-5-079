@@ -41,7 +41,20 @@ SELECT
     COALESCE(death_count, 0)          AS death_count,
     COALESCE(arrested_count, 0)       AS arrested_count,
     COALESCE(seized_item_count, 0)    AS seized_item_count,
-    f.financial_value
+    CASE
+        WHEN f.financial_value IS NULL OR f.financial_value <= 0 THEN NULL
+        WHEN f.financial_value >= 1000000000000
+             AND (COALESCE(n.title, '') || ' ' || COALESCE(f.description, '')) NOT LIKE '%مليار%'
+             THEN ROUND(f.financial_value / 1000000.0, 2)
+        WHEN f.financial_value >= 1000000000
+             AND (COALESCE(n.title, '') || ' ' || COALESCE(f.description, '')) NOT LIKE '%مليار%'
+             THEN ROUND(f.financial_value / 1000.0, 2)
+        ELSE f.financial_value
+    END AS financial_value,
+    (
+        f.financial_value >= 1000000000
+        AND (COALESCE(n.title, '') || ' ' || COALESCE(f.description, '')) NOT LIKE '%مليار%'
+    ) AS is_financial_corrected
 FROM silver.fact_incident f
 JOIN silver.dim_event e
     ON f.event_key = e.event_key
@@ -70,7 +83,7 @@ SELECT
         WHEN TRIM(bi.unit) IN ('جرام', 'غرام') THEN bi.quantity / 1000.0
         ELSE NULL
     END AS quantity_kg,
-    (TRIM(bi.unit) IN ('طن', 'كيلو جرام', 'كيلوجرام', 'كج', 'كيلو غرام', 'كيلوغرام', 'كغ') AND bi.quantity >= 1000) AS is_unit_corrected
+    COALESCE(TRIM(bi.unit) IN ('طن', 'كيلو جرام', 'كيلوجرام', 'كج', 'كيلو غرام', 'كيلوغرام', 'كغ') AND bi.quantity >= 1000, FALSE) AS is_unit_corrected
 
 FROM silver.bridge_incident_item bi
 JOIN gold.fact_incident g

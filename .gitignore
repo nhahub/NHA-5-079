@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 *.tmp
 *.bak
+.pytest_cache/
 
 # Virtual Environments & Secrets
 .venv/
@@ -13,6 +14,7 @@ env/
 ENV/
 .env
 *.env
+.streamlit/secrets.toml
 
 # Data Files (Stored in Bronze storage, not Git)
 data/bronze_crime_news.json
